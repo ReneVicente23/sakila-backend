@@ -29,60 +29,181 @@ conn.connect(
         console.log("Conected")
     }
 );
-
-
-
+let List=[];
 
 app.get("/", (req, res, next) => {
     res.json("{ 'message': 'sakila server online'}");
 });
 
-
-
-
-app.post("/tasks", jsonParser, (req, res, next) => {
-    req.body.id = surrogateKey++;
-    req.body.state = "pending";
-    tasks.push(req.body);
-    res.send("OK");
+//peliculas por country australia id 8, canada id 20
+app.get("/movies/:id", jsonParser, (req, res, next) => {
+    const id= req.params.id;
+    const sql= "SELECT film_id, title from film "+ 
+	"WHERE film_id In(SELECT film_id from inventory "+ 
+		"WHERE store_id in(SELECT store_id from store "+ 
+			"WHERE address_id in(SELECT address_id from address "+
+				"WHERE city_id in(SELECT city_id from city "+
+					"WHERE country_id =" +id+ "))));";
+    conn.query(sql,function(err,result){
+        if(err) throw err;
+         //console.log("Result "+result);
+        res.json(result);
+    }); 
 });
 
-app.listen(3000, () => {
-    console.log("Servidor HTTP funcionando");
+//peliculas por country 10 estrenos
+app.get("/movies/:id/top", jsonParser, (req, res, next) => {
+    const id= req.params.id;
+    const sql= "SELECT film_id, title from film "+
+	"WHERE film_id In(SELECT film_id from inventory "+
+		"WHERE store_id in(SELECT store_id from store "+
+			"WHERE address_id in(SELECT address_id from address "+
+				"WHERE city_id in(SELECT city_id from city "+
+					"WHERE country_id = "+id+")))) "+				
+					"ORDER BY release_year DESC " +
+					"LIMIT 10;";
+    conn.query(sql,function(err,result){
+        if(err) throw err;
+        res.json(result);
+    }); 
 });
 
-app.get("/tasks", (req, res, next) => {
-    res.json(tasks);
+//busqueda peliculas por nombre de pelicula
+app.get("/movies/:id/search/:film", jsonParser, (req, res, next) => {
+    const id= req.params.id;
+    const film=req.params.film;
+    const sql= "SELECT film_id, title from film "+ 
+	"WHERE film_id In(SELECT film_id from inventory "+
+		"WHERE store_id in(SELECT store_id from store "+
+			"WHERE address_id in(SELECT address_id from address "+
+				"WHERE city_id in(SELECT city_id from city "+
+					"WHERE country_id = "+id+")))) "+
+				"AND UPPER(title) like ('"+film+"');";
+    conn.query(sql,function(err,result){
+        if(err) throw err;
+        res.json(result);
+    }); 
 });
 
-app.listen(3000, () => {
-    console.log("Servidor HTTP funcionando");
+//busqueda peliculas por actor
+app.get("/movies/:id/search/:name/:lastname", jsonParser, (req, res, next) => {
+    const id= req.params.id;
+    const name=req.params.name;
+    const lastname=req.params.lastname;
+    const sql= "SELECT film_id, title from film "+
+	"WHERE film_id In(SELECT film_id from inventory "+
+		"WHERE store_id in(SELECT store_id from store "+
+			"WHERE address_id in(SELECT address_id from address "+
+				"WHERE city_id in(SELECT city_id from city "+
+					"WHERE country_id =  "+id+")))) "+
+				"AND film_id IN(SELECT film_id "+
+                   "FROM film_actor "+
+                   "WHERE actor_id IN(SELECT actor_id "+
+                   "FROM actor "+
+                   "WHERE first_name LIKE('"+name+"') AND last_name LIKE('"+lastname+"')));";
+    conn.query(sql,function(err,result){
+        if(err) throw err;
+        res.json(result);
+    }); 
 });
 
-app.get('/tasks/:id', function(req,res) {
-    //res.send("id is set to"+req.params.id)
-    res.json(tasks[req.params.id]);
+//cantidad de stock total(validacion de disponibilidad) por country
+app.get("/movies/:id/available", jsonParser, (req, res, next) => {
+    const id= req.params.id;
+    const sql= "SELECT film_id, COUNT(*) from inventory "+
+	"WHERE store_id in(SELECT store_id from store "+
+			"WHERE address_id in(SELECT address_id from address "+
+				"WHERE city_id in(SELECT city_id from city "+
+					"WHERE country_id = "+id+"))) "+
+	"GROUP by film_id;";
+    conn.query(sql,function(err,result){
+        if(err) throw err;
+        res.json(result);
+    }); 
 });
 
-app.put('/tasks/:id', jsonParser, function(req,res) {
-        res.send("Put invoked " +req.params.id+" any body: " +req.body);
-        tasks[req.params.id]=req.body;
-        req.body.id = parseInt(req.params.id,10);
-        req.body.state = "pending";
+//cantidad de stock de 1 pelicula(validacion de disponibilidad) por country
+app.get("/movies/:id/available/:film_id", jsonParser, (req, res, next) => {
+    const id= req.params.id;
+    const fid= req.params.film_id;
+    const sql= "SELECT film_id, COUNT(*) from inventory "+
+	"WHERE store_id in(SELECT store_id from store "+
+			"WHERE address_id in(SELECT address_id from address "+
+				"WHERE city_id in(SELECT city_id from city "+
+					"WHERE country_id = "+id+"))) "+
+	"AND film_id = "+fid+" "+
+	"GROUP by film_id;";
+    conn.query(sql,function(err,result){
+        if(err) throw err;
+        res.json(result);
+    }); 
 });
 
-app.delete('/tasks/:id', function(req,res) {
-    tasks.splice(req.params.id,1);
-    res.send("delete: "+req.params.id);
-});
-
-app.put('/tasks/:id/:state', jsonParser, function(req,res) {
-    if (req.params.state=="pending") {
-        res.send("Put invoked " +req.params.id+" state: Completed");
-        tasks[req.params.id].state="completed";
-    } else {
-        res.send("Put invoked " +req.params.id+" state: Pending");
-        req.body.id = parseInt(req.params.id,10);
-        tasks[req.params.id].state="pending";
+//carrito de pelicualas a alquilar no mas de 4
+app.post("/list/:id", jsonParser, (req, res, next) => {
+    const id= req.params.id;
+    const aux=0;
+    var lim=0;
+    
+    if(List.length>3){
+        console.log("Nº de peliculas en el carrito superadas");
+    }else{
+        const sql= "SELECT film_id, COUNT(*) from inventory "+
+	"WHERE store_id in(SELECT store_id from store "+
+			"WHERE address_id in(SELECT address_id from address "+
+				"WHERE city_id in(SELECT city_id from city "+
+					"WHERE country_id = "+id+"))) "+
+	"AND film_id = "+req.body.film_id+" "+
+	"GROUP by film_id;";
+    conn.query(sql,function(err,result){
+    for(let Lists of List){
+        if(Lists.film_id==parseInt(req.body.film_id)){
+            lim=1;
+        }
+    }   
+        if(err) throw err;
+        if(result){
+            if(lim==1){
+                console.log("la pelicula ya esta en su carrito"); 
+            }else{
+                req.body.id=surrogateKey++;
+                req.body.date=new Date().toISOString().slice(0, 19).replace('T', ' ');
+                List.push(req.body);
+                console.log("Añadido al carrito"+req.body.return_date);
+            }
+          
+        }
+    }); 
     }
 });
+
+//obtener carrito de compras
+app.get("/list", (req, res, next) => {
+    res.json(List);
+});
+
+//calcular monto
+app.put("/payment", (req, res, next) => {
+    for(let Lists of List){
+       datea= new Date(List.date);
+       dateb= new Date(req.body.date_return);
+    }   
+});
+
+//rentar lista
+app.post("/rental", (req, res, next) => {
+    console.log("req.body ="+req.body.return_date);
+    for(let Lists of List){ 
+        const sql= "INSERT into rental values(null,'"+Lists.date+"',"+Lists.film_id+","+req.body.user_id+",'"+req.body.return_date+"',1,null);";
+        conn.query(sql,function(err,result){
+            if(err) throw err;
+            res.json(result);
+            console.log("alquiler exitoso");
+        });
+    }   
+});
+
+app.listen(3000, () => {
+    console.log("Servidor HTTP funcionando");
+});
+

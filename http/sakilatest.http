@@ -1,0 +1,56 @@
+### Invocar al servidor en mi maquina: localhost
+GET http://localhost:3000/
+
+### obtener peliculas australia 8, canada 20
+GET http://localhost:3000/movies/8
+Content-Type: application/json
+
+### obtener 10 estrenos
+GET http://localhost:3000/movies/8/top
+Content-Type: application/json
+
+### busqueda por nombre
+GET http://localhost:3000/movies/8/search/ALONE_TRIP
+Content-Type: application/json
+
+### busqueda por actor
+GET http://localhost:3000/movies/8/search/ED/CHASE
+Content-Type: application/json
+
+### disponibilidad y stock total
+GET http://localhost:3000/movies/8/available
+Content-Type: application/json
+
+### disponibilidad y stock total de una pelicula por su id
+GET http://localhost:3000/movies/8/available/3
+Content-Type: application/json
+
+### carrito de peliculas no mas de 4 
+POST http://localhost:3000/list/8
+Content-Type: application/json
+
+{
+    "user_id": "2",
+    "film_id": "2"
+}
+
+### obtener carrito
+GET http://localhost:3000/list
+Content-Type: application/json
+
+### calculo del monto a pagar
+PUT http://localhost:3000/payment
+Content-Type: application/json
+
+{
+    "date_return": "2021-11-28 21:55:46",
+}
+
+### alquilar la lista
+POST http://localhost:3000/rental
+Content-Type: application/json
+
+{
+    "user_id":"2",
+    "return_date": "2021-11-28 21:55:46"
+}
