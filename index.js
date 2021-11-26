@@ -139,7 +139,7 @@ app.get("/movies/:id/available/:film_id", jsonParser, (req, res, next) => {
     }); 
 });
 
-//carrito de pelicualas a alquilar no mas de 4
+//carrito de pelicualas a alquilar no mas de 4 requiera autenticacion y autorizacion
 app.post("/list/:id", jsonParser, (req, res, next) => {
     const id= req.params.id;
     const aux=0;
@@ -169,7 +169,7 @@ app.post("/list/:id", jsonParser, (req, res, next) => {
                 req.body.id=surrogateKey++;
                 req.body.date=new Date().toISOString().slice(0, 19).replace('T', ' ');
                 List.push(req.body);
-                console.log("Añadido al carrito"+req.body.return_date);
+                console.log("Añadido al carrito");
             }
           
         }
@@ -183,24 +183,73 @@ app.get("/list", (req, res, next) => {
 });
 
 //calcular monto
-app.put("/payment", (req, res, next) => {
+app.put("/payment", jsonParser, (req, res, next) => {
+    let payment=0;
     for(let Lists of List){
-       datea= new Date(List.date);
-       dateb= new Date(req.body.date_return);
-    }   
+       let datea=new Date();
+       detea=Date.parse(Lists.date);
+       let dateb= new Date(req.body.date_return);
+       let pay=dateb-datea;
+       let aux=pay/(1000*60*60*24);
+       //console.log("val :"+ parseInt(aux));
+       //console.log("a = "+Date.parse(Lists.date)+" : b = "+dateb);
+       payment=payment +parseInt(aux)*0.99;
+    }
+    if(payment>=20){
+        payment=payment-payment*0.2;
+    }else{
+        if(payment>=15){
+            payment=payment-payment*0.15;
+        }else{
+            if(payment>=10){
+                payment=payment-payment*0.1;
+            }
+        }
+    } 
+    console.log("pago final "+payment);  
 });
 
 //rentar lista
-app.post("/rental", (req, res, next) => {
-    console.log("req.body ="+req.body.return_date);
+app.post("/rental", jsonParser, (req, res, next) => {
+   const dtu=req.body.user_id;
+    const dt=req.body.return_date;
+
+    let payment=0;
+    let ids;
     for(let Lists of List){ 
-        const sql= "INSERT into rental values(null,'"+Lists.date+"',"+Lists.film_id+","+req.body.user_id+",'"+req.body.return_date+"',1,null);";
+        const sql= "INSERT into rental values(null,'"+Lists.date+"',"+Lists.film_id+","+dtu+",'"+dt+"',1,null);";
         conn.query(sql,function(err,result){
             if(err) throw err;
-            res.json(result);
-            console.log("alquiler exitoso");
+            //res.json(result);
+            ids=json(result).rental_id;
+            //console.log("alquiler exitoso");
         });
-    }   
+    }
+    for(let Lists of List){
+        let datea=new Date();
+        detea=Date.parse(Lists.date);
+        let dateb= new Date(req.body.return_date);
+        let pay=dateb-datea;
+        let aux=pay/(1000*60*60*24);
+        payment=payment +parseInt(aux)*0.99;
+     }
+     if(payment>=20){
+         payment=payment-payment*0.2;
+     }else{
+         if(payment>=15){
+             payment=payment-payment*0.15;
+         }else{
+             if(payment>=10){
+                 payment=payment-payment*0.1;
+             }
+         }
+     } 
+     const sql2= "INSERT into payment values(null,"+dtu+",1 ,"+ids+","+payment+",null);";
+     conn.query(sql2,function(err,result){
+         if(err) throw err;
+         res.json(result);
+         console.log("alquiler exitoso");
+     });
 });
 
 app.listen(3000, () => {
